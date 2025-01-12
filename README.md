@@ -9,8 +9,8 @@ This the List Function dataset by Rule et al.(2020)
 
 ## GPT-scripts
 Here is the code of this project.  
-api.py:  Handle openai api.  
-gpt_batch_inference.py:  Handle prompts and openai api key.  
+api.py:  Handle OpenAI API.  
+gpt_batch_inference.py:  Handle prompts and OpenAI API key.  
 gpt_cli.py: Core of the experiments. Prompt to the LLM and handle the LLM's output.
 lf_loader.py: Read and load the dataset.  
 log_transformer.py and read_log.py: Used for reading the logs. Donot run this file.
