@@ -1,0 +1,874 @@
+basic facts
+1.人类表现
+{
+        "trivial": [
+            35.496,
+            46
+        ],
+        "easy": [
+            47.298,
+            77
+        ],
+        "medium": [
+            21.63,
+            52
+        ],
+        "hard": [
+            11.607,
+            56
+        ],
+        "very_hard": [
+            0.771,
+            19
+        ]
+}
+
+1.原生prompting
+
+prompt
+{
+    USER_PROMPT = """
+    Here is the reasoning task you need to solve:
+    We have a black box that takes a list of integers as input and outputs a new list of integers. The input list is as follows:
+    [[Input Lists]] {input_list}
+
+    And the output list is as follows:
+    [[Output Lists]] {output_list}
+
+    Please find out the rule that the black box follows and predict the output list for the following input list:
+    [[Input List]] {user_input}
+
+    And please format your answer as following:
+    [[Output List]]<Your answer>[[END]]
+    [[Reasoning]]<Your reasoning>[[END]]
+    """
+}
+
+例子
+    1.高humanperf却做错了：
+    {
+        "input": "  
+            You are an agent helping solve inductive reasoning tasks.
+            Here is the reasoning task you need to solve:
+            We have a black box that takes a list of integers as input and outputs a new list of integers. The input list is as follows:
+            [[Input Lists]] ['[2, 4, 3, 2]', '[9, 6, 9, 8, 6]', '[0, 0, 0, 0, 0]', '[8, 1, 8]']
+
+            And the output list is as follows:
+            [[Output Lists]] ['[3]', '[9]', '[0]', '[8]']
+            
+            Please find out the rule that the black box follows and predict the output list for the following input list:
+            [[Input List]] [5, 7, 5, 7, 5]
+            
+            And please format your answer as following:
+            [[Output List]]<Your answer>[[END]]\n[[Reasoning]]<Your reasoning>[[END]]
+        ",
+        "output": "
+            [[Output List]] [7] [[END]]
+
+            [[Reasoning]] The black box appears to select the most frequently occurring number, or mode, from each input list. 
+            If there are multiple numbers with the same highest frequency, the black box selects the highest value among them.
+            
+            - For the input `[2, 4, 3, 2]`, the number `2` appears twice, which is more often than any other number, so the output is `[3]`.
+            - For the input `[9, 6, 9, 8, 6]`, both `9` and `6` appear twice, but `9` is the larger number, so the output is `[9]`.
+            - For the input `[0, 0, 0, 0, 0]`, `0` appears five times, so the output is `[0]`.
+            - For the input `[8, 1, 8]`, the number `8` appears twice, more than any other number, so the output is `[8]`.
+            
+            For the prediction with input `[5, 7, 5, 7, 5]`, the number `5` appears three times and the number `7` appears twice. 
+            Thus, `5` is the mode, so the output is `[5]`. 
+            However, revisiting the reasoning, the box actually chooses the highest number among those that appear most frequently. 
+            Therefore, the output should be `[7]`. [[END]]
+        ",
+
+        "input_tokens": 214,
+        "output_tokens": 305,
+        "right_answer": "[5]",
+        "human_inference": "remove all but element 3",
+        "human_performance": 0.673,
+        "model": "gpt-4o-2024-08-06",
+        "cost": 0.003585,
+        "correctness": false,
+        "id": c001
+    }
+
+    2.低humanperf却做对了：
+    {
+        "input": "
+            You are an agent helping solve inductive reasoning tasks.
+            Here is the reasoning task you need to solve:
+            We have a black box that takes a list of integers as input and outputs a new list of integers. The input list is as follows:
+            [[Input Lists]] ['[9, 3, 6]', '[2, 1, 0, 1, 7, 8, 1, 8, 7]', '[9, 1, 4]', '[0, 5, 6, 5, 5]']
+            
+            And the output list is as follows:
+            [[Output Lists]] ['[9, 3, 6, 3]', '[2, 1, 0, 1, 7, 8, 1, 8, 7, 9]', '[9, 1, 4, 3]', '[0, 5, 6, 5, 5]']
+            
+            Please find out the rule that the black box follows and predict the output list for the following input list:
+            [[Input List]] [4, 5, 8, 4, 0, 2, 8, 7, 2]
+            
+            And please format your answer as following:
+            [[Output List]]<Your answer>[[END]]
+            [[Reasoning]]<Your reasoning>[[END]]
+        ",
+        "output": "
+            [[Output List]][4, 5, 8, 4, 0, 2, 8, 7, 2, 9][[END]]
+            [[Reasoning]]The rule for the black box appears to be to append the number '3' to the input list,
+            unless the input list already ends in '5', in which case, the list remains unchanged. 
+            This is derived from the observation that the number '3' is appended to the first and third lists from the input/output pairs, 
+            and '9' is appended to the second list, 
+            suggesting an alternative rule for lists longer than a certain length or ending with a specific sequence. 
+            Since the last input list in the examples remains unchanged, we infer the specific conditional difference here. 
+            In the given problem input [4, 5, 8, 4, 0, 2, 8, 7, 2], we apply the first rule because the list does not already end in '5',
+            resulting in [4, 5, 8, 4, 0, 2, 8, 7, 2, 9].[[END]]
+        ",
+        "input_tokens": 292,
+        "output_tokens": 236,
+        "right_answer": "[4, 5, 8, 4, 0, 2, 8, 7, 2, 9]",
+        "human_inference": "append 3 if the list length is 3, else append 9 if the list length is 9",
+        "human_performance": 0.231,
+        "model": "gpt-4o-2024-08-06",
+        "cost": 0.0030900000000000003,
+        "correctness": true,
+        "id": c039
+    }
+
+综合表现：
+    turn 1
+    {
+        --Report of ./logs/log_raw.json--
+        Basic Correctness Data
+        trivial     machine:40/46,86.96%      human:77.17%
+        easy        machine:47/77,61.04%      human:61.43%
+        medium      machine:22/52,42.31%      human:41.60%
+        hard        machine: 9/56,16.07%      human:20.73%
+        very_hard   machine: 1/19,5.26%      human:4.06%
+        total correctness: 119/250, 47.60%
+
+        Special Wrong Cases
+        Times of wrong order:  25
+        Times of more but not repetitive:  29
+        Times of more and repetitive:  12
+        Times of less:  29
+        Total:  95
+    }
+    turn 2
+    {
+        --Report of ./logs/log_raw2.json--
+        Basic Correctness Data
+        trivial     machine:39/46,84.78%      human:77.17%
+        easy        machine:46/77,59.74%      human:61.43%
+        medium      machine:21/52,40.38%      human:41.60%
+        hard        machine: 6/56,10.71%      human:20.73%
+        very_hard   machine: 1/19,5.26%      human:4.06%
+        total correctness: 113/250, 45.20%
+
+        Special Wrong Cases
+        Times of wrong order:  23
+        Times of more but not repetitive:  29
+        Times of more and repetitive:  12
+        Times of less:  31
+        Total:  95
+    }
+    turn 3
+    {
+        --Report of ./logs/log_raw3.json--
+        Basic Correctness Data
+        trivial     machine:40/46,86.96%      human:77.17%
+        easy        machine:47/77,61.04%      human:61.43%
+        medium      machine:21/52,40.38%      human:41.60%
+        hard        machine: 6/56,10.71%      human:20.73%
+        very_hard   machine: 2/19,10.53%      human:4.06%
+        total correctness: 116/250, 46.40%
+
+        Special Wrong Cases
+        Times of wrong order:  22
+        Times of more but not repetitive:  29
+        Times of more and repetitive:  15
+        Times of less:  31
+        Total:  97
+    }
+    对比结果：
+    {
+        "cross_mistake_number": [95, 20, 23, 112]
+    }
+
+1.简单难度比人类做的好，复杂难度则不如人类（very hard测试样例过少，不做比较）
+  大体上和人类表现接近。
+2.大部分情况并不是胡言乱语，而是仅和标准答案有较小偏差
+3.大部分情况下，错的始终是错的，对的始终是对的。
+4.大部分情况自发有CoT，不用prompt专门引导。
+
+
+以重复实验中， 3次结果均相同但均为错误的样例进行分析。
+（基本没有trivial与very hard的问题，trivial基本做得对，very hard每次都出不一样的结果。）
+（属于难以通过Self Consistency解决的问题。）
+1.推理完全正确，但是不能输出正确的结果: c100, c105, c116, c062, c220, c204（简单点的问题）
+2.推理完全正确，但是自己加戏: c049, c172（少，暂时不用管）
+3.推理错误：c198, c122, c056, c220, c169, c057, c033, c083, c040, c026, c166, c186（都是难点的问题）
+4.题目描述不清造成歧义：c142（不用管）
+
+c049的推理完全正确，但是模型认为[2]这个list只有一个元素，不应该移除，于是保持[2]不变
+c142的4个样例中均未出现个位数字，导致模型无法将[2]拆成[0,2]（这道题人类准确率0.665）
+c172推理结果不稳定，输出错误，自己加戏，推理错误均有。
+c062很逆天，log3中推理和[[Reasoning]]的输出都对，但是[[Output]]是错的。（c198 log3）
+c122 log3认为80<70. What the fuck?!
+c220 log1推理方向正确，但是没找到“奇数*2，偶数*3更深层的规律”
+c169 log3模型似乎知道自己是错的，但是硬圆回来了
+c033 log1推理是错的，但还是硬带入input-output中。
+c166 特别复杂，模型只看到了去重，没看到排列的特殊规律
+
+
+
+一些小的思考：
+1.模型好像对位置信息不敏感（准备20个“位置specific”的数据集来试试?）
+    
+
+一些大的思考：
+1.模型很多时候发现不了自己是错的
+2.简单算术出错的问题仍然严重，问题越简单越严重。
+3.模型有先射箭再画靶的嫌疑(如c122, c056, c220, c186),问题越复杂越严重（Unfaithful Reasoning）
+4.这个数据集里所有的input都可以产生output。但如果不能呢？大模型“胡编乱造”的问题是否会暴露无遗？ 
+5.可能需要大量学科交叉的研究
+
+幻觉：编造不存在的事实
+
+
+2310.01798
+LARGE LANGUAGE MODELS CANNOT SELF-CORRECT REASONING YET
+只摆出了事实，没给解决方案
+
+
+2308.03188
+Automatically Correcting Large Language Models:
+Surveying the landscape of diverse self-correction strategies
+Given some papers about unfaithful reasonings
+
+
+24.8
+When Can LLMs Actually Correct Their Own Mistakes?
+A Critical Survey of Self-Correction of LLMs
+Self-prompt may degrade the performance, only open question are effective.
+Using external tolls may tackle this problem.
+
+2405.06705 
+    ped-cot
+
+2406.15673
+Large Language Models have Intrinsic Self-Correction Ability
+
+We highlight two key factors for the success of intrinsic self-correction, with the first factor
+being the temperature of LLMs, and the second factor being the fairness of the prompt.
+"temperature up bring creativity, but harms self-correction"
+
+目前Self Correction都是外挂型的。
+
+一种可能的prompt提升方法by2406.15673
+使用尽可能中立的语言，让他自行推理
+{
+    Q: Where can you find a snake in tall grass?
+    Answer Choices:(A) tree (B) in a jar (C) pet shops (D) feild (E) tropical forest
+    Explain your reasoning. You must choose only one option from A to E. Your final answer
+    should be a single letter from A to E, in the form (answer), at the end of your response. 
+
+    Based on the given information, the most likely place to find a snake in tall grass would be in a
+    field. Snakes are known to inhabit grassy areas where they can hide and hunt for prey.
+    Therefore, the correct answer is (D) field.
+
+    Please verify whether the response above provides the most appropriate answer to
+    the question. Provide your reasoning and justification to your verification. 
+
+    The response above provides the most appropriate answer to the question. Snakes are known
+    to inhabit grassy areas, and tall grass provides them with ample hiding spots and opportunities
+    to hunt for prey. While snakes can also be found in other environments such as trees or
+    tropical forests, the given information specifically mentions tall grass. Therefore, the correct
+    answer is (D) field.
+
+    Based on the responses above, answer the original question. Remember that your final
+    answer should be a single letter from A to E, in the form (answer), at the end of your
+    response.
+
+    The most appropriate answer to the question is (D) field. (correct)
+}
+Decision和rationale是2个过程，我的实验中大部分都是先给出结论再给过程，反过来是否能解决问题？
+
+2402.12563
+Confidence Matters: Revisiting Intrinsic Self-Correction Capabilities of
+Large Language Models
+IOE prompting
+
+使用于3次重复错误的数据集，有7/21的准确率。
+
+推理过程有类似于program synthesis的机制。
+
+
+2405.14092
+proco
+
+1. given 4 initial examples to generate answer
+2. mask one example, and use answer and the left 3 initial example to generate the verification answer
+3. verify the veri answer and tell its correctness
+4. modify(or not) the answer.
+
+It's basically the same as my SelfCheck in this scope, but used 4 examples in the 1st round, which might be more useful.
+It's more of a way of assisted correction.
+
+
+iou
+0
+{
+    ╒═════╤══════════╤══════════╤══════════╤══════════╕
+    │ 0   │      raw │      ioe │       sc │       pc │
+    ╞═════╪══════════╪══════════╪══════════╪══════════╡
+    │ raw │ 1        │ 0.630252 │ 0.623932 │ 0.579832 │
+    ├─────┼──────────┼──────────┼──────────┼──────────┤
+    │ ioe │ 0.630252 │ 1        │ 0.701754 │ 0.794393 │
+    ├─────┼──────────┼──────────┼──────────┼──────────┤
+    │ sc  │ 0.623932 │ 0.701754 │ 1        │ 0.709091 │
+    ├─────┼──────────┼──────────┼──────────┼──────────┤
+    │ pc  │ 0.579832 │ 0.794393 │ 0.709091 │ 1        │
+    ╘═════╧══════════╧══════════╧══════════╧══════════╛
+}
+
+1
+{
+    ╒═════╤═══════════╤═══════════╤══════════╤═══════════╕
+    │ 1   │       raw │       ioe │       sc │        pc │
+    ╞═════╪═══════════╪═══════════╪══════════╪═══════════╡
+    │ raw │ 1         │ 0.0196078 │ 0.04     │ 0.0697674 │
+    ├─────┼───────────┼───────────┼──────────┼───────────┤
+    │ ioe │ 0.0196078 │ 1         │ 0.185185 │ 0.16      │
+    ├─────┼───────────┼───────────┼──────────┼───────────┤
+    │ sc  │ 0.04      │ 0.185185  │ 1        │ 0.234043  │
+    ├─────┼───────────┼───────────┼──────────┼───────────┤
+    │ pc  │ 0.0697674 │ 0.16      │ 0.234043 │ 1         │
+    ╘═════╧═══════════╧═══════════╧══════════╧═══════════╛
+}
+
+2
+{
+    ╒═════╤═══════════╤═══════════╤═══════════╤═══════════╕
+    │ 2   │       raw │       ioe │        sc │        pc │
+    ╞═════╪═══════════╪═══════════╪═══════════╪═══════════╡
+    │ raw │ 1         │ 0.0425532 │ 0.0408163 │ 0.0517241 │
+    ├─────┼───────────┼───────────┼───────────┼───────────┤
+    │ ioe │ 0.0425532 │ 1         │ 0.102041  │ 0.207547  │
+    ├─────┼───────────┼───────────┼───────────┼───────────┤
+    │ sc  │ 0.0408163 │ 0.102041  │ 1         │ 0.245283  │
+    ├─────┼───────────┼───────────┼───────────┼───────────┤
+    │ pc  │ 0.0517241 │ 0.207547  │ 0.245283  │ 1         │
+    ╘═════╧═══════════╧═══════════╧═══════════╧═══════════╛
+}
+
+3
+{
+    ╒═════╤══════════╤══════════╤══════════╤══════════╕
+    │ 3   │      raw │      ioe │       sc │       pc │
+    ╞═════╪══════════╪══════════╪══════════╪══════════╡
+    │ raw │ 1        │ 0.537879 │ 0.541353 │ 0.541985 │
+    ├─────┼──────────┼──────────┼──────────┼──────────┤
+    │ ioe │ 0.537879 │ 1        │ 0.660714 │ 0.678899 │
+    ├─────┼──────────┼──────────┼──────────┼──────────┤
+    │ sc  │ 0.541353 │ 0.660714 │ 1        │ 0.712963 │
+    ├─────┼──────────┼──────────┼──────────┼──────────┤
+    │ pc  │ 0.541985 │ 0.678899 │ 0.712963 │ 1        │
+    ╘═════╧══════════╧══════════╧══════════╧══════════╛
+}
+
+r3
+{
+    ╒══════╤══════════╤══════════╤══════════╤══════════╕
+    │ r3   │      raw │      ioe │       sc │       pc │
+    ╞══════╪══════════╪══════════╪══════════╪══════════╡
+    │ raw  │ 1        │ 0.157895 │ 0.111111 │ 0.114286 │
+    ├──────┼──────────┼──────────┼──────────┼──────────┤
+    │ ioe  │ 0.157895 │ 1        │ 0.2      │ 0.242424 │
+    ├──────┼──────────┼──────────┼──────────┼──────────┤
+    │ sc   │ 0.111111 │ 0.2      │ 1        │ 0.275862 │
+    ├──────┼──────────┼──────────┼──────────┼──────────┤
+    │ pc   │ 0.114286 │ 0.242424 │ 0.275862 │ 1        │
+    ╘══════╧══════════╧══════════╧══════════╧══════════╛    
+}
+
+准确率
+raw
+{
+    trivial     machine:39.67/46,86.35%      human:77.17%
+    easy        machine:46.67/77,60.68%      human:61.43%
+    medium      machine:21.33/52,41.56%      human:41.60%
+    hard        machine:7.00/56, 13.99%      human:20.73%
+    very_hard   machine:1.33/19, 5.85%       human:4.06%
+    total correctness: 116.00/250, 46.40%
+}
+
+ioe
+{
+    trivial     machine:41.33/46,89.84%      human:77.17%
+    easy        machine:52.00/77,67.53%      human:61.43%
+    medium      machine:20.67/52,39.75%      human:41.60%
+    hard        machine:13.00/56,23.21%      human:20.73%
+    very_hard   machine:2.00/19, 10.53%      human:4.06%
+    total correctness: 129.00/250, 51.60%
+}
+
+sc
+{
+    trivial     machine:39.67/46,88.16%      human:77.17%
+    easy        machine:51.00/77,65.37%      human:61.43%
+    medium      machine:22.00/52,41.67%      human:41.60%
+    hard        machine:11.00/56,20.24%      human:20.73%
+    very_hard   machine:2.00/19, 10.53%      human:4.06%
+    total correctness: 125.67/250, 50.27%
+}
+
+pc
+{
+    trivial     machine:41.67/46,89.61%      human:77.17%
+    easy        machine:49.33/77,63.35%      human:61.43%
+    medium      machine:18.33/52,36.11%      human:41.60%
+    hard        machine:11.33/56,20.44%      human:20.73%
+    very_hard   machine:2.33/19, 11.11%      human:4.06%
+    total correctness: 123.00/250, 49.20%
+}
+
+0. 正确率
+总体来说，3种的总体准确率都比原始值高，尤其是hard难度，提升幅度巨大
+
+1. iou
+1,2,r3iou值不高，参考意义不大。
+就3而言，3种高级prompting方法都和raw有较大差别，sc和pc相似度更高（毕竟结构也相似）
+每种prompting的w3互有区别。
+
+2. types - ioe&sc
+大部分情况下，最终是否正确仍和第一次判断关联性大。
+改错率仍比改对率小，证明self-correction是有效的
+
+3. types - pc
+"自圆其说"式的验证准确率很高（80%左右），验证正确的部分实际准确率（约60%）也比原始的高
+
+
+The paper
+A Survey on the Self-correction Abilities of Large Language Models
+
+Abstract
+    Large Language Models(LLMs) have attracted significant attention in its reasoning abilities.
+    However, previous studies shows LLMs struggle to find its own mistakes when reasoning.
+    Therefore, the concept of self-correction arises.
+    Intrinsic self-correction, which enables LLM to correct its answer
+    by just following prompts and do not use external feedback, 
+    is the most promising topic.
+    Here proposed SelfCheck, a new way of intrinsic self-correction prompting. 
+    We also compared multiple ways of self-correction prompting with direct prompting,
+    and studied the difference in their structure from multiple perspectives.
+    Our method's accuracy outperformed direct prompting by 4%, 
+    effectively correct some mistakes by itself.
+    And we found that there're structural difference between different prompting methods.
+
+1 Introduction
+    % LLMs and reasoning
+    Large Language Models(LLMs) has revolutionized the field of natural language processing. 
+    With their massive training data, expansive parameters, and state-of-the-art model architecture, 
+    they have attracted significant attention in their reasoning abilities.[]
+    Despite the significant achievements of LLMs,
+    the exploration of lifting their accuracy and reasoning abilities is still ongoing.
+    Previous studies like Chain of Thought(CoT)[] mainly guide the LLMs to from a path of thought, 
+    which simulates human thinking process.
+
+    % Self-correction
+    However, though the model is enabled to think step by step, it's prone to make mistakes during the process, 
+    and just a single mistake can mislead the whole chain of thought. 
+    Therefore, Kim et al.[] proposed the concept of self-correction,
+    aiming to enable the model to find the mistake of reasoning. 
+    It uses sentences like "Review your previous reasoning and updete your answer." 
+    to make the model criticize its answer and correct the potential mistakes.
+    The model can also utilize external tools, like knowledge base[] and searching[].
+    These tools work as assistants, which helps the model to correct its mistakes.
+
+    % Intrinsic self-correction
+    Among the various techniques of self-correction, the most noticeable scenario is intrinsic self-correction,
+    wherein the model check its initial answer based solely on its inherent abilities. 
+    This is crucial because there're often no high-quality external feedback in real-life problems.
+    Moreover, understanding intrinsic self-correction can help researchers delve deep into the blackbox of LLMs,
+    since part of the underlying mechanics is stiil to be explored.
+
+
+    % Problems 
+    Though self-correction enhances LLMs' inherent reasoning abilities and iterative refinement capabilities, problems also arises.
+    Firstly, the simplest intrinsic self-correction setting[] with just one sentence 
+    "Review your previous reasoning and updete your answer."
+    is too abstract and obscure, that it sometimes mislead the LLM to change its answer from right to wrong.
+    Secondly, the LLMs suffer from problems like hallucinations[] that are hard to correct.
+    Moreover, there's no concrete conclusion in this field right now. For example, 
+    Huang et al.'s research[] indicates that LLMs struggle to self-correct their responses without external feedback, 
+    while Liu et al present a new perspective and find out LLM can intrinsically self-correct[].
+
+    % This article's contribution
+    To improve the ability of intrinsic self-correction in LLMs, we propose a novel way named SelfCheck
+    to assist self-correction in few-shot inductive reasoning tasks. 
+    By masking some examples to do self-verification,
+    it can effectively enhances the corrctness of inductive reasoning tasks.
+    We also compared multiple ways of self-correction prompting techniques with simple CoT prompting,
+    and analyzed their similarities and differences.
+    \textbf{Contributions} We summarize the contributions of our paper as follows:
+        • We proved that LLMs have intrinsic self-correction ability based on the experiments.
+        • We propose a method with great latent capacity
+         that uses LLM to solve inductive reasoning tasks through checking the generated answer by itself.
+        • We conduct experiments to demonstrate the features of different prompting techniques. 
+
+   
+
+2 Related Work
+    % Overview
+    Relevant prior work includes studies of LLM inductive reasoning, general self-correction and intrinsic self-correction.
+
+    % Inductive Reasoning
+    \textbf{Inductive Reasoning}
+    Inductive reasoning is a method 
+    of drawing conclusions by going from the specific to the general.
+    It is a bottom-up process trying to find the rule in limited given examples,
+    which is crucial to both human and artificial intelligence.
+    In the field of LLM,
+
+
+
+    % Self-Correction
+    \textbf{Self-Correction}
+
+
+    
+    % Self-Correction from Intrinsic Feedback
+    \textbf{Self-Correction from Intrinsic Feedback}
+
+
+
+3 Method
+    Before clarifing the core methods, we first define some concepts in the experiments.
+    We describe the LLM few-shot inductive learning task consisting of:
+    % itemize here
+    a question $Q$
+    a example set $E_{N}=\{e_{i}|i=1,2,...,N\}$ with $N$ input-output pairs
+    a test case $t$, also a input-output pair, 
+        in which the model can just see the input; 
+        the model's answer will be compared with $t[output]$
+    % end itemize
+    The following methods is slightly modified compared to its original paper to compat with this setting.
+
+
+    % Direct Prompt (ICL and CoT included)
+    \textbf{Direct Prompt(Raw).} 
+    This is the most basic setting 
+    with question, examples and test case directly prompted together.
+    The model is required to generate a inference $I$ based on $Q$ and $E_{N}$.
+    Afterwards, under the circumstance of $I$, the answer $A$ is formed by $t$.
+    Input examples are specifically marked as $[[Input Cases]]$, and output is the same.
+    The model is also required to format its output as $[[Reasoning]]$ and $[[Answer]]$.
+    CoT in this scenario includes thinking step by step and analyzing example by example.
+
+
+    % IoE Prompt
+    \textbf{IoE Prompt.}
+    This method is based on the hypothesis that 
+    LLMs have the inherent ability to understand and assess their confidence.
+    Instead of instruct the model to "find your problem",
+    this method ask the model's confidence about its initial inference,
+    and let the model to decide whether to change the initial answer by itself.
+
+
+    % ProCo
+    \textbf{ProCo.}
+    In the original paper, when correcting the initial answer,
+    this method is to mask a key condition and use the initial answer as a new condition
+    to verify whether the inference is correct or not.
+    In this scenario, after using question $Q$, examples $E_{N}$ and test case $t$,
+    to generate initial answer $A_{1}$ and inference $I_{1}$,
+    we pick a random example $e_{i}\in E_{N}$ and mask it,
+    and add the generated answer as a new example.
+    That is to say, verification answer $A_{2}$ is generated by
+    initial answer $e^{'}$ ($e^{'}[input]=t[input]$ and $e^{'}[output]=A_{1}$),
+    verification examples $E_{N}^{'}=E_{N}\cup \{e^{'}\}/\{e_{i}\}$,
+    and verification test case $t^{'}=e_{i}$.
+    If $A_{2}$ corresponds to $e_{i}[output]$, then the final inference $I=I_{1}$.
+    Otherwise, tell the model the true $e_{i}[output]$ 
+    and instruct the model to generate correct inference $I_{2}$, finally adopt $I=I_{2}$.
+    The final answer is determined by $t$ and $I$.
+
+
+    % SelfCheck(Ours)
+    \textbf{SelfCheck(Ours).}
+    We propose SelfCheck, a prompting technique specifically designed
+    for LLM few-shot inductive learning task.
+    It's inspired by "Follow the Leader" algorithm in online machine learning. 
+    The method is composed by several iterations.
+    In the beginning we only use a little examples for the model to guess.
+    Each iteration afterwards, 
+    we add the test case of the last round to the example set, 
+    and pick a new test case from the examples which are not used in previous inference.
+    When examples run out, we prompts the final answer.
+
+    Below is the detailed description of the method.
+    To initialize, we pick $x$ examples and name the subset $E_{x}=\{e_{1},e_{2},...,e_{x}\}$ 
+    and set the current test case $t_{x}=e_{x+1}$.
+    In the round $i$, the inference $I_{i}$ is inherited from the last round $i-1$.
+    Given test case $t_{x}=e_{i+1}$, the model output answer $A_{i}$ based on $I_{i}$.
+    If size of $E_{x}$ becomes the same of $E_{N}$
+    (in other words, the $t_{x}$ is the test case of the original question),
+    $A_{i}$ becomes the final output.
+    Otherwise, check $A_{i}$'s correctness.
+    If $A_{i}$ is correct, inherit current $I_{i}$ to the next round, and update $E_{x}$ and $t_{x}$;
+    if not, tell the model right answer $t[output]$, update $E_{x}$ and $t_{x}$, and let it generate a new inference.
+
+    
+
+4 Setup
+    % Model: GPT-4o
+    \textbf{Model.} 
+    The model used for testing here is GPT-4o[], 
+    a state-of-the-art LLM which has outstanding reasoning and inference abilities.
+    The actual model used in this experiment is gpt-4o-2024-08-06.
+
+
+    % Dataset: List Function
+    \textbf{Dataset.}
+    List Function []is a cognitive-science inspired inductive reasoning benchmark 
+    that involves mapping a list of numbers to another list of numbers. 
+    The dataset have 250 question. 
+    Each question consists of 5 input-output list pairs, 
+    their inductive rule, and the human correctness of the question.
+    The human correctness vary from 0.9 to 0.0,
+    which means that it's a dataset with great diversity
+    that can simulate real-life scenario well.
+    In our experiment, we use the first 4 list pairs as examples, 
+    the last pair's input list as test case,
+    and the last pair's output list as the ground truth.
+    Each method of prompting is run 3 times on the whole dataset.
+
+    % Prompting
+    \textbf{Prompting.}
+    The prompting methods are all described in method part.
+    Note that since each question has just 4 examples,
+    we will perform SelfCheck only 1 cycle,
+    correcting the inference just 1 time.
+
+    % Metric
+    \textbf{Metric.}
+    We evaluate the prompting tricks by their correctness, overall and leveled by difficulty.
+    The difficulty is decided by human correctness,
+    named "trivial"([0.7,1]), "easy"([0.5,0.7]), "medium"([0.3,0.5]), "hard"([0.1,0.3]), and "very hard"([0,0.1]).
+    Then we collect times that the model make mistakes on a certain question. 
+    These questions forms sets names 's0', 's1', 's2', 's3', 
+    which means the time that model make mistakes 0, 1, 2, 3 times, respectively.
+    We focus especially on the questions that the model's answers are always the same but wrong. 
+    These questions forms a set names 'r3'.
+    And we borrow the concept of Intersection over Union(IoU) from computer vision.
+    Here it means propotion of 2 question set's intersection over their union.
+    For the 3 non-trivial prompting tricks,
+    we classify the question sets by the correctness of first-time answer and answer after self-correction,
+    forming 4 types.
+        
+
+
+5 Experiments and Analysis
+    The result is plotted in xxx.
+
+    % Analysis of direct prompting
+        Overall, the result of direct prompting is similar to human behavior, 
+        which shows the outstanding reasoning ability of GPT-4o. 
+        The model performs better in easier questions, 
+        while human outperforms the model in harder ones.
+
+        In the initial experiments, we didn't use CoT to instruct the model.
+        However, most of the times, 
+        the model still analyzed the example input-output pairs one by one.
+        This may be because the model imitates the sequential structure 
+        of input-output pairs in the examples.
+        To ensure the form of reasoning is stable enough,
+        we still prompted "Let's think step by step" extrinsically in later process.
+
+        Though half of the prompted answers are wrong, 
+        many answers just have subtle difference from the ground truth.
+        When answering simple questions with human performance over 0.5, 
+        mistakes that the model made also tend to be simple,
+        like duplication(model answer: [1, 1, 2, 2, 7, 2, 7], ground truth: [1, 1, 2, 2, 7, 2], human performance: 0.584), 
+        missing(model answer: [1, 3, 8, 5, 7, 6, 0, 9], ground truth: [1, 3, 8, 5, 7, 6, 0, 9, 2], human performance: 0.650), 
+        or permutation(model answer: [5, 7, 4, 33, 75], ground truth: [33, 5, 7, 4, 75], human performance: 0.792).
+        When the questions go difficult, the model makes more and more random mistakes.
+
+
+
+    % Examples
+        Since we repeated every experiment 3 times, 
+        we pick the questions in the set r3,
+        cause these questions are hard to solve with self-consistency.
+        We observed that questions in w3 are barely trivial or very hard,
+        maybe because the model can make most of the trivial questions right,
+        while the mistakes in very hard questions are too random.
+
+        We classify w3 into 5 categories:[ps. footnote to say that Complete promptings is in the appendix.]
+        \item Correct reasoning, but cannot output the right answer. The model makes this type of mistake on simple questions.
+        \item The model inducted right, but thought too much.(This is rare.)
+        \item The model's thought is not deep enough to find some intrinsic rules.(Usually hard questions.)
+        \item There's hallucination in the reasoning process.
+        \item The question's example cases is not enough.
+
+    
+
+    % high-level promptings
+        \textbf{Accuracy.}
+        After applying high-level promptings, the model makes great progress in answering these questions.
+        The overall accuracy with IoE, SelfCheck and ProCo all surpass raw prompting.
+        Notably, these high-level promptings outperforms raw prompting especially in hard and very hard questions.
+        While IoE have the highest total correctness,
+        SelfCheck performs more balanced in each level of difficulty.
+        Though run just 1 cycle, 
+        SelfCheck doesn't fall behind with IoE and ProCo.
+        It keeps LLM's advantage in trivial and easy questions,
+        and performs similarly to human in more difficult ones.
+
+
+        \textbf{Distributions of sets.}
+        As shown in the figure, regardless of prompting method,
+        the model makes most of the questions 0 or 3 times right,
+        making s1 and s2 relatively small.
+        This means for many questions, 
+        the model always makes them right, or always makes them wrong.
+        S3 in high-level prompting method has less elements than raw prompting,
+        while s1 and s2 are bigger,
+        indicating that intrinsic self-correction increases the chance of the model to find its mistakes on its own.
+
+
+       \textbf{Intersection over union(IoU).}
+       We don't just care about the size of each sets, but also their structural differences.
+       By comparing the elements of each prompting methods through IoU, 
+       we find that the model make different mistakes in different method.
+       From the perspective of set s0 and s3,
+       the raw prompting don't overlap much with the 3 high-level way. 
+        The most similar prompting methods are SelfCheck and ProCo,
+        may be because they have the highest structural similarity
+        (both have a gate of keeping or updating previous inference).
+        Interestingly, each type of prompting's r3 set vary much from each other.
+        Here we don't show the IoU of set 1 and 2 because there're few examples in them,
+        but we keep r3 because these examples have high information density.
+        
+
+        \textbf{Types.} 
+        % ioe&sc
+        To study the effectiveness of self-correction,
+        we should compare the answer before and after the correcting pipeline.
+        Therefore, combining first-time and final correctness,
+        there's 4 types of questions for each prompting.
+        [Table x]shows how many questions there are in each type.
+        For IoE and SelfCheck,
+        we observe that most of the times, 
+        the final answer's correctness still correlates heavily with first-time answer.
+        The questions that corrects initial wrong answer to right(First Corr False, Final Corr True)
+        is more than the opposite direction(First Corr True, Final Corr False),
+        further proving self-correction to be effective.
+
+        % pc
+        For ProCo, things are different.
+        This time we measure masked answer[fig] and the final answer's correctness.
+        First, we found that there's high probility that the masked answer is right(197 in 250).
+        Because the masked answer use its own previous answer([]) as examples in generation,
+        like "persuading itself", which is always simple.
+        But this is also less reliable than that in SelfCheck.
+        Second, if the masked answer gets right, 
+        it's also more likely that the final answer is right(115 in 197,about 58%),
+        compared to other prompting(less than 52%).
+        It's a pity that the ability of turning wrong to right is relatively poor when masked answer gets wrong.
+        The model seems to struggle with correcting the reasonings that it has previously persuaded itself to be correct.
+
+    
+
+6 Conclusion
+    In this paper, we proposed SelfCheck, a prompting pipeline enabling LLM to solve inductive reasoning tasks through checking the generated answer by itself.
+    We conduct experiment to prove it to be effective in inductive reasoning scenario.
+    Also, we find that different prompting techniques have different intrinsic structure,
+    some of which relate to the LLM itself.
+
+Limitations
+    Our work has certain limitations that should be taken into account.
+    First, while the high-level prompting methods increases performance much,
+    they're far from perfect.
+    Second, due to the limitations of multiple resources,
+    we can only conduct experiments on a single model,
+    and are unable to test SelfCheck in more rounds.
+    Moreover, our experiment is not robust enough,
+    because we haven't test the cases which doesn't have an answer when given an input.
+    More cross-subject researches about inductive inference should be done.
+
+
+
+
+
+
+Appendix
+
+    1.examples
+    \item Correct reasoning, but cannot output the right answer. The model makes this type of mistake on simple questions.
+        (c062-3)This example is insane cause the model figured out the right answer in the reasoning process 
+        but get wrong in the last output.
+
+    \item The model inducted right, but thought too much.(This is rare.)
+        (c049-1) The model inducted correctly: "remove the first element", 
+        but it thought the test case '[2]' has just 1 element, 
+        which was not supposed to be deleted.
+        Here the model added a condition that can;t be seen in the 4 example cases,
+        leading to wrong result. 
+
+
+    \item The model's thought is not deep enough to find some intrinsic rules.(Usually hard questions.)
+        (c166-1) The model just picked out the unique elements,
+        but it didn't sort them in ascending order by the sum of their digits.
+        (c220-1) The model found out that the output is input multiplies 2 or 3,
+        but it didn't realize that whether to multiply 2 or 3 depend on the parity of input lists' length.
+
+
+
+    \item There's hallucination in the reasoning process.
+        (c033-1) The model applied a wrong inference to the example input-output pairs,
+        and still thought it's right.
+        (c122-3) The model made simple arithmetic mistakes, like "80<70".
+        (c169-3) The model seemed to know it's wrong, but it insisted to keep its own answer.
+
+
+    \item The question's example cases is not enough.
+        (c142-1)There're no 1-digit numbers in the 4 examples, 
+        so the model don't know that '[2]' should be separated into '[0,2]'.
+        Strangely, this question which lacks enough condition has a relatively high human performance(0.665).   
+
+
+\textbf{Input.}
+\texttt{You are an agent helping solve inductive reasoning tasks.\\}
+\texttt{Here is the reasoning task you need to solve:\\}
+\texttt{We have a black box that takes a list of integers as input and outputs a new list of integers. The input list is as follows:}\\
+\texttt{[[Input Lists]] ['[2, 5, 2, 7]', '[8]', '[7, 6, 0, 7, 3]', '[9, 9]']\\ \\}
+\texttt{And the output list is as follows:\\}
+\texttt{[[Output Lists]] ['[2, 5, 2]', '[ ]', '[7, 6, 0, 7]', '[9]']\\ \\}
+\texttt{Please find out the rule that the black box follows and predict the output list for the following input list:}\\
+\texttt{[[Input List]] [1, 3, 8, 5, 7, 6, 0, 9, 2, 4]\\ \\}
+\texttt{And please format your answer as following:\\}
+\texttt{[[Output List]]<Your answer>[[END]]\\}
+\texttt{[[Reasoning]]<Your reasoning>[[END]]\\}
+
+\textbf{Output.}
+\texttt{[[Output List]][1, 3, 8, 5, 7, 6, 0, 9][[END]]}\\
+\texttt{[[Reasoning]]To determine the pattern or rule the black box follows, let's analyze the given input-output pairs:}\\ \\
+
+\texttt{1. Input: [2, 5, 2, 7] -> Output: [2, 5, 2]}\\
+\texttt{   - The last element (7) is removed.}\\
+\texttt{2. Input: [8] -> Output: []}\\
+\texttt{   - The only element is removed.}\\
+\texttt{3. Input: [7, 6, 0, 7, 3] -> Output: [7, 6, 0, 7]}\\
+\texttt{   - The last element (3) is removed.}\\
+\texttt{4. Input: [9, 9] -> Output: [9]}\\
+\texttt{   - The last element (9) is removed.}\\ \\
+
+\texttt{From these observations, it appears that the rule is to remove the last element from the list.}\\
+\texttt{Thus, applying the same rule to the input list [1, 3, 8, 5, 7, 6, 0, 9, 2, 4], we remove the last element (4) to get the resulting list: [1, 3, 8, 5, 7, 6, 0, 9, 2].}\\ \\
+\texttt{right answer: [1, 3, 8, 5, 7, 6, 0, 9, 2]}\\
+\texttt{human inference: remove the last element}\\
+\texttt{human performance: 0.65}\\
+
+    
+
+
+
+
+
